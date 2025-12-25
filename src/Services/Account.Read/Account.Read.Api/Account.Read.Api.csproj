@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.1.0" />
+    <PackageReference Include="MassTransit.RabbitMQ" Version="8.5.7" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Account.Read.Infrastructure\Account.Read.Infrastructure.csproj" />
+    <ProjectReference Include="..\Account.Read.Core\Account.Read.Core.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Banky.Contracts\Banky.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\Aspire\Banky.ServiceDefaults\Banky.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+</Project>
