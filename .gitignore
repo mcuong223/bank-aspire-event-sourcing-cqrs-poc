@@ -358,3 +358,4 @@ MigrationBackup/
 
 # Project-specific ignores
 /spec*.md
+/build_output*
