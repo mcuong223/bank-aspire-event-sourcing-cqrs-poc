@@ -22,16 +22,16 @@ graph TD
     
     subgraph "Write Side (Optimized)"
         CmdAPI --> Domain --> DIY_Repo
-        DIY_Repo -.->|1. Load (Snapshot + Events)| PG_Write[(Write DB)]
+        DIY_Repo -.->|"1. Load (Snapshot + Events)"| PG_Write[(Write DB)]
         DIY_Repo -.->|2. Save Events| PG_Write
-        DIY_Repo -.->|3. Save Snapshot (Every 5th)| PG_Write
+        DIY_Repo -.->|"3. Save Snapshot (Every 5th)"| PG_Write
         DIY_Repo -.->|4. Produce| Kafka{Kafka Topic}
     end
 
     subgraph "Read Side (Autonomous Consumers)"
         Kafka -.->|Group: Balance| C1[Balance Projector]
         Kafka -.->|Group: History| C2[History Projector]
-        Kafka == New Group: Loyalty (Offset 0) ==> C3[Loyalty Projector]
+        Kafka == "New Group: Loyalty (Offset 0)" ==> C3[Loyalty Projector]
         
         C1 -->|Upsert| T1[AccountView]
         C2 -->|Append| T2[TransactionHistory]
