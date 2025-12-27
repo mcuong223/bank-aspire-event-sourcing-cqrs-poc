@@ -3,13 +3,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Account.Command.Infrastructure.Data;
 
-public class EventStoreDbContext : DbContext
+public class EventStoreDbContext(DbContextOptions<EventStoreDbContext> options) : DbContext(options)
 {
-    public EventStoreDbContext(DbContextOptions<EventStoreDbContext> options) : base(options)
-    {
-    }
-
     public DbSet<EventEntity> Events { get; set; }
+    public DbSet<SnapshotEntity> Snapshots { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

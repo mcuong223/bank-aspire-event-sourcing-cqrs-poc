@@ -1,69 +1,117 @@
 # Banky.POC 🏦
 
-> A High-Fidelity Proof of Concept designed for my **Internal Knowledge Sharing** session on **Event-Driven Architecture Series: Event Sourcing + CQRS**.
+> A High-Fidelity Proof of Concept designed for **Internal Knowledge Sharing** sessions on **Event-Driven Architecture Series: ES + CQRS**.
 
 [![.NET 9](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Aspire](https://img.shields.io/badge/Orchestration-.NET%20Aspire-blueviolet)](https://learn.microsoft.com/en-us/dotnet/aspire/)
-[![Architecture](https://img.shields.io/badge/Architecture-Physical%20CQRS-success)]()
+[![Broker](https://img.shields.io/badge/Broker-Apache%20Kafka-black?logo=apachekafka)](https://kafka.apache.org/)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)]()
 
-**Banky.POC** is a distributed banking system playground that demonstrates complex patterns without "magic" libraries. It enforces **Strict Clean Architecture** through physical project separation and implements a **"Do-It-Yourself" (DIY) Event Store** using EF Core.
+**Banky.POC** is a distributed banking system playground built to illustrate **Event Sourcing**, **Physical CQRS**, and **Streaming Architecture** concepts. Unlike typical "Hello World" examples, this project enforces **Strict Clean Architecture** and uses **Apache Kafka** to demonstrate true decoupling and autonomous replay capabilities.
 
-## 📐 Architecture
+## 📐 Architecture Overview
 
-The system implements **Physical CQRS**, separating Write and Read concerns into distinct microservices with their own databases, synchronized via **Integration Events**.
+The system implements **Physical CQRS** with **Kafka** as the central nervous system. The Read Side is completely autonomous—it builds its state solely by consuming the immutable Event Log from Kafka.
+
+
 
 ```mermaid
 graph TD
     User([User]) -->|POST| CmdAPI[Account.Command]
     User -->|GET| ReadAPI[Account.Read]
     
-    subgraph "Write Side"
+    subgraph "Write Side (Optimized)"
         CmdAPI --> Domain --> DIY_Repo
-        DIY_Repo -->|Save JSON| PG_Write[(Write DB)]
-        DIY_Repo -.->|Publish| Rabbit{RabbitMQ}
+        DIY_Repo -.->|1. Load (Snapshot + Events)| PG_Write[(Write DB)]
+        DIY_Repo -.->|2. Save Events| PG_Write
+        DIY_Repo -.->|3. Save Snapshot (Every 5th)| PG_Write
+        DIY_Repo -.->|4. Produce| Kafka{Kafka Topic}
     end
 
-    subgraph "Read Side"
-        Rabbit -.->|Consume| Worker
-        Worker -->|Project| PG_Read[(Read DB)]
+    subgraph "Read Side (Autonomous Consumers)"
+        Kafka -.->|Group: Balance| C1[Balance Projector]
+        Kafka -.->|Group: History| C2[History Projector]
+        Kafka == New Group: Loyalty (Offset 0) ==> C3[Loyalty Projector]
+        
+        C1 -->|Upsert| T1[AccountView]
+        C2 -->|Append| T2[TransactionHistory]
+        C3 -->|Calc Time-Weight| T3[LoyaltyView]
+
+        T1 --> PG_Read[(Read DB)]
+        T2 --> PG_Read
+        T3 --> PG_Read
         ReadAPI --> PG_Read
     end
 ```
 
 ## ✨ Key Features
 
--   **DIY Event Sourcing**: Manual implementation using EF Core (Serialization, Versioning, Rehydration) to demonstrate the core mechanics without external dependencies.
--   **Physical CQRS**: Complete separation of Write (Command) and Read (Query) services/databases for scalability and isolation.
--   **Strict Clean Architecture**: Applied rigidly across all services using separate `.csproj` projects to enforce Dependency Inversion.
--   **Cloud-Native Orchestration**: Uses **.NET Aspire** to bootstrap PostgreSQL and RabbitMQ for seamless local development.
+### 1. Consumer-Driven Replay (Via Kafka)
+This features demonstrates **Zero-Coupling Replay**:
+- **The Problem:** How to build a new view (e.g., Loyalty) from past data without asking the Write Service?
+- **The Solution:** We deploy the `LoyaltyProjector` with a fresh **Kafka Consumer Group** and set `AutoOffsetReset = Earliest`.
+- **The Result:** Kafka automatically streams the entire event history to this new consumer. The Write Service is completely unaware.
+
+### 2. Polyglot Projections (3 Distinct Patterns)
+Demonstrating that "One Event Stream" can generate "Many Views":
+* **View 1: Account Balance (Snapshot)** - Upsert logic.
+* **View 2: Transaction History (Audit Log)** - Append-only logic.
+* **View 3: VIP Loyalty Tracker (Derived Logic)**
+    * Implements a **Time-Weighted Average Algorithm** to calculate VIP scores based on deposit duration, preventing "money churning" fraud.
+
+### 3. Performance Optimization: Snapshotting
+Addresses the "N+1 Problem" of Event Sourcing.
+- **Mechanism:** Instead of replaying 1,000 events to load an account, the system automatically saves a JSON Snapshot of the Aggregate state every 5 events (configurable).
+- **Impact:** `Load time = O(1)` instead of `O(N)`.
+
+### 4. "DIY" Event Sourcing & Clean Architecture
+Manual implementation using EF Core (Serialization, Versioning) and strict Physical Project Separation to enforce Dependency Inversion.
 
 ## 🛠️ Tech Stack
 
 -   **.NET 9** & **.NET Aspire 9.0**
--   **EF Core** (PostgreSQL)
--   **MassTransit** (RabbitMQ)
+-   **Apache Kafka** (Message Broker)
+-   **Kafka UI** (Visualization Dashboard)
+-   **PostgreSQL** (Database)
+-   **MassTransit** (Kafka Transport)
 -   **xUnit**, **FluentAssertions**, **NSubstitute**
 
-## 🚀 Quick Start
+## ⚖️ Architectural Trade-offs (POC vs. Production)
 
-1.  **Clone & Run**:
-    ```bash
-    git clone https://github.com/mcuong223/bank-aspire-event-sourcing-cqrs-poc.git
-    cd src/Aspire/Banky.AppHost
-    dotnet run
-    ```
+| Feature | In this POC | In Production |
+| :--- | :--- | :--- |
+| **Consistency** | **Dual Write**: We save to Postgres and then Produce to Kafka. There is a slight risk of inconsistency if the process crashes between these two steps. | **Transactional Outbox Pattern**: Use a tool like Debezium or an Outbox table to guarantee "At-least-once" delivery from DB to Kafka. |
+| **Snapshotting** | **Inline**: Done synchronously during the Save process. | **Async Worker**: Snapshots should be taken by a background process to avoid blocking the user request. |
 
-2.  **Dashboard**: Open the link in console (e.g., `https://localhost:18888`) to view services, traces, and DBs.
+## 🚀 Quick Start & Demo Script
+
+### 1. Run the System
+```bash
+git clone https://github.com/mcuong223/bank-aspire-event-sourcing-cqrs-poc.git
+cd src/Aspire/Banky.AppHost
+dotnet run
+```
+Aspire will spin up containers for **Kafka**, **Zookeeper**, **Postgres**, and **Kafka UI**.
+
+### 2. Visualizing Data
+Open the **Kafka UI** link from the Aspire Dashboard (usually mapped to port `8080`).
+- Go to **Consumers** tab to see the Lag (messages waiting to be processed).
+
+### 3. The "Replay" Demo
+1.  **Generate Data:** Create accounts and make transactions.
+2.  **Observe:** See `Balance` and `History` consumers updating in real-time.
+3.  **Deploy New Feature:** Uncomment/Enable the `LoyaltyProjector` (Simulating a new deploy).
+4.  **Magic Moment:** Watch Kafka UI. You will see the new **Loyalty Consumer Group** appear with a high Lag, then rapidly drain to 0 as it replays history to build the VIP Tiers.
 
 ## 📂 Structure Overview
 
 ```text
 src/
-├── Aspire/                 # Orchestration (Postgres/RabbitMQ setup)
-├── Shared/                 # Shared Contracts (Integration Events)
+├── Aspire/                 # Orchestration (Kafka/Kafka-UI setup)
+├── Shared/                 # Contracts
 ├── Services/
-│   ├── Account.Command/    # Write Service (Clean Arch: Domain/App/Infra/API)
-│   └── Account.Read/       # Read Service (Clean Arch: Core/Infra/API)
+│   ├── Account.Command/    # WRITE: EF Core (Snapshots) -> Kafka Producer
+│   └── Account.Read/       # READ: Kafka Consumers -> EF Core Projections
 └── tests/                  # Unit Tests
 ```
 

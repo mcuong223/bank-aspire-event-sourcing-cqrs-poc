@@ -6,12 +6,12 @@ namespace Account.Command.Application;
 public class AccountService
 {
     private readonly IEventStoreRepository _repository;
-    private readonly IPublishEndpoint _publishEndpoint;
+    private readonly IEventPublisher _publisher;
 
-    public AccountService(IEventStoreRepository repository, IPublishEndpoint publishEndpoint)
+    public AccountService(IEventStoreRepository repository, IEventPublisher publisher)
     {
         _repository = repository;
-        _publishEndpoint = publishEndpoint;
+        _publisher = publisher;
     }
 
     public async Task DepositAsync(Guid accountId, decimal amount)
@@ -31,7 +31,7 @@ public class AccountService
 
         foreach (var @event in events)
         {
-            await _publishEndpoint.Publish(@event);
+            await _publisher.PublishAsync(@event);
         }
     }
 
@@ -51,7 +51,7 @@ public class AccountService
 
         foreach (var @event in events)
         {
-            await _publishEndpoint.Publish(@event);
+             await _publisher.PublishAsync(@event);
         }
     }
 }

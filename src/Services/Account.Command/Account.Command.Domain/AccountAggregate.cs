@@ -55,4 +55,19 @@ public class AccountAggregate : AggregateRoot
                 break;
         }
     }
+
+    public record AccountSnapshot(Guid Id, decimal Balance);
+
+    public override object? GetSnapshot() => new AccountSnapshot(Id, Balance);
+
+    public override void LoadSnapshot(object snapshot)
+    {
+        if (snapshot is AccountSnapshot s)
+        {
+            Id = s.Id;
+            Balance = s.Balance;
+        }
+    }
+
+    public override Type? GetSnapshotType() => typeof(AccountSnapshot);
 }

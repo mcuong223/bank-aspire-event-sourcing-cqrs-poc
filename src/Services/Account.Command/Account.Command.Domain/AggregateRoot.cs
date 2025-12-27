@@ -44,4 +44,14 @@ public abstract class AggregateRoot
     }
 
     protected abstract void Apply(object @event);
+
+    public virtual object? GetSnapshot() => null;
+    public virtual void LoadSnapshot(object snapshot) { }
+    public virtual Type? GetSnapshotType() => null;
+
+    public void HydrateFromSnapshot(object snapshot, int version)
+    {
+        LoadSnapshot(snapshot);
+        Version = version;
+    }
 }

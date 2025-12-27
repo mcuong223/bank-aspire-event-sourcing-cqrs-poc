@@ -1,7 +1,10 @@
 using Account.Command.Application;
 using Account.Command.Infrastructure.Data;
 using Account.Command.Infrastructure.Repositories;
+using Account.Command.Infrastructure.Services;
+using Banky.Contracts;
 using MassTransit;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,16 +24,22 @@ builder.Services.AddScoped<AccountService>();
 // MassTransit
 builder.Services.AddMassTransit(x =>
 {
-    x.UsingRabbitMq((context, cfg) =>
+    x.UsingInMemory((context, cfg) => cfg.ConfigureEndpoints(context));
+
+    x.AddRider(rider =>
     {
-        var connectionString = builder.Configuration.GetConnectionString("rabbitmq");
-        if (connectionString != null)
+        rider.AddProducer<FundsDeposited>("funds-deposited");
+        rider.AddProducer<FundsWithdrawn>("funds-withdrawn");
+
+        rider.UsingKafka((context, k) =>
         {
-            cfg.Host(new Uri(connectionString));
-        }
-        cfg.ConfigureEndpoints(context);
+            k.Host(builder.Configuration.GetConnectionString("kafka"));
+        });
     });
 });
+
+builder.Services.AddScoped<IEventPublisher, KafkaEventPublisher>();
+builder.Services.AddHostedService<KafkaTopicInitializer>();
 
 var app = builder.Build();
 
@@ -54,9 +63,7 @@ app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<EventStoreDbContext>();
-    // db.Database.EnsureCreated(); // Or migrate. 
-    // In POC, EnsureCreated is fine.
-    await db.Database.EnsureCreatedAsync();
+    await db.Database.MigrateAsync();
 }
 
 app.Run();

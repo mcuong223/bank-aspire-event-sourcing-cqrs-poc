@@ -1,19 +1,18 @@
+using Account.Read.Core;
 using Account.Read.Infrastructure;
-using Account.Read.Core; // Assuming AccountView is here
 using Banky.Contracts;
 using MassTransit;
-using Microsoft.EntityFrameworkCore;
 
 namespace Account.Read.Api.Consumers;
 
-public class AccountProjector : 
+public class AccountBalanceProjector : 
     IConsumer<FundsDeposited>,
     IConsumer<FundsWithdrawn>
 {
     private readonly ReadDbContext _context;
-    private readonly ILogger<AccountProjector> _logger;
+    private readonly ILogger<AccountBalanceProjector> _logger;
 
-    public AccountProjector(ReadDbContext context, ILogger<AccountProjector> logger)
+    public AccountBalanceProjector(ReadDbContext context, ILogger<AccountBalanceProjector> logger)
     {
         _context = context;
         _logger = logger;
@@ -21,7 +20,7 @@ public class AccountProjector :
 
     public async Task Consume(ConsumeContext<FundsDeposited> context)
     {
-        _logger.LogInformation("Projecting Deposit: {Amount} for Account {AccountId}", context.Message.Amount, context.Message.AccountId);
+        _logger.LogInformation("Projecting Deposit Balance: {Amount} for Account {AccountId}", context.Message.Amount, context.Message.AccountId);
 
         var account = await _context.Accounts.FindAsync(context.Message.AccountId);
         if (account == null)
@@ -38,7 +37,7 @@ public class AccountProjector :
 
     public async Task Consume(ConsumeContext<FundsWithdrawn> context)
     {
-         _logger.LogInformation("Projecting Withdrawal: {Amount} for Account {AccountId}", context.Message.Amount, context.Message.AccountId);
+        _logger.LogInformation("Projecting Withdrawal Balance: {Amount} for Account {AccountId}", context.Message.Amount, context.Message.AccountId);
 
         var account = await _context.Accounts.FindAsync(context.Message.AccountId);
         if (account != null)

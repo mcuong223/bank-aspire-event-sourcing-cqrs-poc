@@ -10,4 +10,12 @@ public class ReadDbContext : DbContext
     }
 
     public DbSet<AccountView> Accounts { get; set; }
+    public DbSet<TransactionHistoryView> TransactionHistory { get; set; }
+    public DbSet<LoyaltyView> LoyaltyScores { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<LoyaltyView>().HasKey(l => l.AccountId);
+        base.OnModelCreating(modelBuilder);
+    }
 }

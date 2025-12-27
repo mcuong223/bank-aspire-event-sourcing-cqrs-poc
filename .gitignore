@@ -357,4 +357,4 @@ healthchecksdb
 MigrationBackup/
 
 # Project-specific ignores
-/spec.md
+/spec*.md
